@@ -1,0 +1,58 @@
+trigger:
+- none
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: api_new_quality
+
+jobs:
+  - job:
+    displayName: Quality Tasks
+    steps:
+      # Checkout with persist credentials
+      - checkout: self
+        persistCredentials: true
+
+      - bash : |
+          cd "$(Build.SourcesDirectory)/src/05-Tests"  
+          dotnet build "./apieventsr.Tests.csproj" -c Release
+          dotnet test "./apieventsr.Tests.csproj" --configuration Release --logger xunit --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+        displayName: 'Run Unit Tests'
+        
+      - task: PublishTestResults@2
+        displayName: 'Publish Test Results '
+        inputs:
+          testRunner: XUnit
+          testResultsFiles: '**/*.xml'
+        condition: succeededOrFailed()
+
+      - task: PublishCodeCoverageResults@2
+        displayName: 'Publish code coverage report'
+        inputs:
+          codeCoverageTool: 'Cobertura'
+          summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.cobertura.xml'
+
+        condition: succeededOrFailed()
+      - task: trivy@1
+        displayName: Trivy Security Scan
+        inputs:
+          version: 'v0.51.4'
+          docker: false
+          path: '$(Build.SourcesDirectory)'
+          exitCode: '0'
+
+      - bash: |
+          cd $(Build.SourcesDirectory)/src 
+          echo "$PWD"
+          dotnet tool install --global dotnet-sonarscanner --version  5.7.0
+          dotnet tool install --global dotnet-coverage
+          dotnet sonarscanner begin /k:"$(SONAR_PROJECT_KEY)" /d:sonar.cs.vscoveragexml.reportsPaths=$(Build.SourcesDirectory)/src/05-Tests/coverage.xml /d:sonar.host.url="$(SONAR_URL)"  /d:sonar.login="$(SONAR_TOKEN)"
+          cd "$(Build.SourcesDirectory)/src/01-Presentation"
+          echo "$PWD"
+          dotnet build "./Redacao.Api.csproj" -c Release
+          cd "$(Build.SourcesDirectory)/src/05-Tests"  
+          dotnet-coverage collect 'dotnet test' -f xml  -o 'coverage.xml'
+          dotnet sonarscanner end /d:sonar.login="$(SONAR_TOKEN)"
+        displayName: Sonar Scan
+      

@@ -1,0 +1,169 @@
+trigger:
+  branches:
+    include:
+      - 'master'
+      - 'homolog'
+      - 'qa'
+      - 'develop'
+
+pool:
+  vmImage: 'ubuntu-22.04'
+
+variables:
+  - group: api_${{ variables['Build.SourceBranchName'] }}
+  - name: REPOSITORY_NAME
+    value: $(CHART_PATH)
+  - name: TAG
+    value: $(Build.BuildId)
+  - name: HELM_NAMESPACE
+    value: log-service
+  - name: ARTIFACT_NAME
+    value: log-service__api_artifact_${{ variables['Build.SourceBranchName'] }}
+  - name: ENVIRONMENT_NAME
+    value: api_${{ variables['Build.SourceBranchName'] }}
+
+resources:
+  repositories:
+    - repository: k8s-config
+      type: git
+      name: k8s-catalog/k8s-catalog
+
+stages:
+  - stage: quality
+    displayName: Quality Evaluation
+    condition: eq(variables['build.sourceBranchName'], 'qa')
+    jobs:
+      - job:
+        displayName: Quality Tasks
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+            displayName: 'Install Node.js'
+
+          - script: |
+              npm install -g yarn
+              yarn install --frozen-lockfile
+              npx prisma generate --schema=./src/infra/data/prisma/schemas/postgres/schema.prisma
+              yarn run test:ci
+            displayName: 'Yarn install and Run Unit test'
+
+          - task: PublishTestResults@2
+            displayName: 'Publish Test Results '
+            inputs:
+              testResultsFiles: $(System.DefaultWorkingDirectory)/results/results_junit.xml
+            condition: succeededOrFailed()
+
+          #publish code coverage reports in cobertura format
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish code coverage results'
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/results/coverage/cobertura-coverage.xml'
+            condition: succeededOrFailed()
+
+          - task: trivy@1
+            displayName: Trivy Security Scan
+            inputs:
+              path: $(Build.SourcesDirectory)
+              docker: false
+              exitCode: 0
+
+          - bash: |
+              export SONAR_SCANNER_VERSION=4.7.0.2747
+              export SONAR_SCANNER_HOME=$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux
+              curl --create-dirs -sSLo $HOME/.sonar/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
+              unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
+              export PATH=$SONAR_SCANNER_HOME/bin:$PATH
+              export SONAR_SCANNER_OPTS="-server"
+              export SONAR_TOKEN=$(SONAR_TOKEN)
+              sonar-scanner -Dsonar.projectKey=$(SONAR_PROJECT_KEY) -Dsonar.sources=./src -Dsonar.host.url=https://sonarqubeappsec.azurewebsites.net -Dsonar.javascript.lcov.reportPaths=./results/coverage/lcov.info -Dsonar.testExecutionReportPaths=./results/test-report.xml
+            displayName: Sonar Scan
+
+  - stage: build_app
+    displayName: Build Docker Image
+    dependsOn: quality
+    condition: |
+      or(
+          and(not(eq(variables['build.sourceBranchName'], 'qa')), in(dependencies.quality.result, 'Skipped')),
+          and(eq(variables['build.sourceBranchName'], 'qa'), in(dependencies.quality.result, 'Succeeded'))
+        )
+    jobs:
+      - job:
+        displayName: ${{ variables['Build.SourceBranchName'] }} Build and Push Tasks
+        steps:
+          - task: Docker@2
+            inputs:
+              containerRegistry: $(CONTAINER_REGISTRY)
+              command: buildAndPush
+              repository: $(REPOSITORY_NAME)
+              tags: |
+                $(TAG)
+
+      - job:
+        displayName: Publish Helm
+        steps:
+          - checkout: k8s-config
+          - task: HelmDeploy@0
+            displayName: Helm package
+            inputs:
+              connectionType: Kubernetes Service Connection
+              kubernetesServiceConnection: $(KUBERNETES_SERVICE_CONNECTION)
+              namespace: $(HELM_NAMESPACE)
+              command: package
+              chartPath: $(CHART_PATH)
+              chartVersion: $(TAG)
+              destination: $(Build.ArtifactStagingDirectory)
+
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: $(ARTIFACT_NAME)
+
+  - stage: aks_deploy
+    displayName: Deploy to Aks
+    dependsOn: build_app
+    condition: and(not(eq(variables['build.sourceBranchName'], 'qa')), in(dependencies.build_app.result, 'Succeeded'))
+    jobs:
+      - deployment:
+        displayName: ${{ variables['Build.SourceBranchName'] }} Helm
+        environment: $(ENVIRONMENT_NAME)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: $(ARTIFACT_NAME)
+                - checkout: self
+                - checkout: k8s-config
+                - task: HelmDeploy@0
+                  inputs:
+                    connectionType: Kubernetes Service Connection
+                    kubernetesServiceConnection: $(KUBERNETES_SERVICE_CONNECTION)
+                    namespace: $(HELM_NAMESPACE)
+                    command: upgrade
+                    install: true
+                    chartType: FilePath
+                    chartPath: $(Pipeline.Workspace)/$(ARTIFACT_NAME)/api-$(TAG).tgz
+                    releaseName: $(RELEASE_NAME)
+                    chartVersion: $(TAG)
+                    valueFile: $(HELM_CHART_VALUE)
+                    arguments: >
+                      --set image.repository=$(REPOSITORY)/$(REPOSITORY_NAME)
+                      --set image.tag=$(TAG)
+                      --set env.secret.DATABASE_URL=$(DATABASE_URL)
+                      --set env.secret.JWT_SECRET=$(JWT_SECRET)
+                      --set env.secret.DAYS_VALIDATE_INVITE=$(DAYS_VALIDATE_INVITE)
+                      --set env.secret.TEMPLATE_MAIL_ID=$(TEMPLATE_MAIL_ID)
+                      --set env.secret.JWT_APP_ID=$(JWT_APP_ID)
+                      --set env.secret.JWT_EXPIRESIN_PMAIS=$(JWT_EXPIRESIN_PMAIS)
+                      --set env.secret.JWT_SECRET_MS=$(JWT_SECRET_MS)
+                      --set env.secret.PMAIS_URL=$(PMAIS_URL)
+                      --set env.secret.POLIEDRO_COMMUNICATION_SERVICE_URL=$(POLIEDRO_COMMUNICATION_SERVICE_URL)
+            on:
+              failure:
+                steps:
+                  - task: HelmDeploy@0
+                    inputs:
+                      connectionType: Kubernetes Service Connection
+                      kubernetesServiceConnection: $(KUBERNETES_SERVICE_CONNECTION)
+                      namespace: $(HELM_NAMESPACE)
+                      command: rollback

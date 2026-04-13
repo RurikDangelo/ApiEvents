@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: apieventsr-db
+    environment:
+      POSTGRES_DB: apieventsr_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - apieventsr_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  apieventsr_data:

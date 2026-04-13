@@ -1,0 +1,59 @@
+trigger:
+  branches:
+    include:
+      - 'main'
+      - 'staging'
+      - 'qa'
+      - 'develop'
+
+pool:
+  vmImage: 'ubuntu-20.04'
+
+
+variables:
+  - group: api_${{ variables['Build.SourceBranchName'] }}
+  - name: REPOSITORY_NAME
+    value: $(CHART_PATH)
+  - name: TAG
+    value: $(Build.BuildId)
+  - name: HELM_NAMESPACE
+    value: sso
+  - name: ARTIFACT_NAME
+    value: poliedro_sso_artifact_${{ variables['Build.SourceBranchName'] }}
+  - name: ENVIRONMENT_NAME
+    value: api_${{ variables['Build.SourceBranchName'] }}
+  
+resources:
+  repositories:
+    - repository: k8s-config
+      type: git
+      name: k8s-catalog/k8s-catalog
+    - repository: templates
+      type: git
+      ref: refs/tags/v1.0
+      name: devops-central/pipelines
+      
+stages:
+  - template: backend/template.yml@templates
+    parameters:
+      CHART_PATH: $(CHART_PATH)
+      HELM_NAMESPACE: $(HELM_NAMESPACE)
+      ENVIRONMENT_NAME: $(ENVIRONMENT_NAME)
+      TAG: "$(Build.BuildId)"
+      APPLICATION: $(APPLICATION)
+      CONTAINER_REGISTRY: $(CONTAINER_REGISTRY)
+      KUBERNETES_SERVICE_CONNECTION: $(KUBERNETES_SERVICE_CONNECTION)
+      RELEASE_NAME: $(RELEASE_NAME)
+      REPOSITORY: $(REPOSITORY)
+      HELM_CHART_VALUE: $(HELM_CHART_VALUE)
+      WIKI_ENDPOINT: $(WIKI_ENDPOINT)
+      RELEASE_NOTES_NAME: $(WIKI_FILE)
+      steps:
+        - task: Docker@2
+          inputs:
+            containerRegistry: '$(CONTAINER_REGISTRY)'
+            repository: '$(REPOSITORY_NAME)'
+            command: 'buildAndPush'
+            Dockerfile: '**/src/01-Presentation/Dockerfile'
+            buildContext: '$(Build.SourcesDirectory)/src'
+            tags: '$(TAG)'

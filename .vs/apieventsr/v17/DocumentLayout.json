@@ -1,0 +1,41 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\rurik.dangelo2\\source\\repos\\apieventsr\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{16187781-57AD-4871-8D63-01C551D8F56E}|apieventsr\\src\\02-Application\\apieventsr.Application.csproj|c:\\users\\rurik.dangelo2\\source\\repos\\apieventsr\\apieventsr\\src\\02-application\\dtos\\requests\\entityrequest.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{16187781-57AD-4871-8D63-01C551D8F56E}|apieventsr\\src\\02-Application\\apieventsr.Application.csproj|solutionrelative:apieventsr\\src\\02-application\\dtos\\requests\\entityrequest.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "EntityRequest.cs",
+              "DocumentMoniker": "C:\\Users\\rurik.dangelo2\\source\\repos\\apieventsr\\apieventsr\\src\\02-Application\\Dtos\\Requests\\EntityRequest.cs",
+              "RelativeDocumentMoniker": "apieventsr\\src\\02-Application\\Dtos\\Requests\\EntityRequest.cs",
+              "ToolTip": "C:\\Users\\rurik.dangelo2\\source\\repos\\apieventsr\\apieventsr\\src\\02-Application\\Dtos\\Requests\\EntityRequest.cs",
+              "RelativeToolTip": "apieventsr\\src\\02-Application\\Dtos\\Requests\\EntityRequest.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-08T14:06:57.63Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
