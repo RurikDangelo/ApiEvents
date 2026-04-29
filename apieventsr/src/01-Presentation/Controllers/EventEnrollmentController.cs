@@ -3,6 +3,7 @@ using apieventsr.Application.Dtos.Responses;
 using apieventsr.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace apieventsr.Controllers
@@ -20,6 +21,12 @@ namespace apieventsr.Controllers
             _service = service;
         }
 
+        private string? GetUserIdClaim()
+        {
+            return User.FindFirst("sub")?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+
         [HttpGet("all")]
         [SwaggerOperation(
             "Listar minhas inscrições",
@@ -34,7 +41,7 @@ namespace apieventsr.Controllers
             if (!Guid.TryParse(schoolIdClaim, out var schoolId))
                 return Unauthorized(new { error = "Claim school_id ausente ou inválido no token." });
 
-            var userIdClaim = User.FindFirst("sub")?.Value;
+            var userIdClaim = GetUserIdClaim();
             Guid? userId = Guid.TryParse(userIdClaim, out var parsedUser) ? parsedUser : null;
 
             // TODO: confirmar com o time o claim e os valores de role no Keycloak
@@ -58,7 +65,7 @@ namespace apieventsr.Controllers
             var schoolIdClaim = User.FindFirst("school_id")?.Value;
             Guid? schoolId = Guid.TryParse(schoolIdClaim, out var parsedSchool) ? parsedSchool : null;
 
-            var userIdClaim = User.FindFirst("sub")?.Value;
+            var userIdClaim = GetUserIdClaim();
             Guid? userId = Guid.TryParse(userIdClaim, out var parsedUser) ? parsedUser : null;
 
             // TODO: confirmar com o time o claim e os valores de role no Keycloak
@@ -88,7 +95,7 @@ namespace apieventsr.Controllers
             if (!Guid.TryParse(schoolIdClaim, out var schoolId))
                 return Unauthorized(new { error = "Claim school_id ausente ou inválido no token." });
 
-            var userIdClaim = User.FindFirst("sub")?.Value;
+            var userIdClaim = GetUserIdClaim();
             Guid? userId = Guid.TryParse(userIdClaim, out var parsedUser) ? parsedUser : null;
 
             var role = User.FindFirst("role")?.Value ?? "school";
@@ -114,7 +121,7 @@ namespace apieventsr.Controllers
             if (!Guid.TryParse(schoolIdClaim, out var schoolId))
                 return Unauthorized(new { error = "Claim school_id ausente ou inválido no token." });
 
-            var userIdClaim = User.FindFirst("sub")?.Value;
+            var userIdClaim = GetUserIdClaim();
             Guid? userId = Guid.TryParse(userIdClaim, out var parsedUser) ? parsedUser : null;
 
             var role = User.FindFirst("role")?.Value ?? "school";
@@ -140,7 +147,7 @@ namespace apieventsr.Controllers
             if (!Guid.TryParse(schoolIdClaim, out var schoolId))
                 return Unauthorized(new { error = "Claim school_id ausente ou inválido no token." });
 
-            var userIdClaim = User.FindFirst("sub")?.Value;
+            var userIdClaim = GetUserIdClaim();
             if (!Guid.TryParse(userIdClaim, out var authorId))
                 return Unauthorized(new { error = "Claim sub ausente ou inválido no token." });
 
